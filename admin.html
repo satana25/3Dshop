@@ -2,68 +2,73 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>3DPrintCraft | Панель Оператора</title>
+    <title>3DPrintCraft | Адмін-панель</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; background: #000c18; color: white; padding: 20px; }
-        .admin-card { background: #001f3f; padding: 20px; border-radius: 10px; border: 2px solid #00d4ff; max-width: 500px; margin: auto; }
-        input, textarea, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: none; }
-        button { background: #28a745; color: white; font-weight: bold; cursor: pointer; }
-        .product-list { margin-top: 20px; border-top: 1px solid #444; padding-top: 10px; }
-        .item { background: #002b53; padding: 10px; margin-bottom: 5px; display: flex; justify-content: space-between; }
+        body { font-family: 'Segoe UI', sans-serif; background: #000c18; color: white; padding: 20px; }
+        .card { background: #001f3f; padding: 25px; border-radius: 12px; border: 1px solid #00d4ff; max-width: 500px; margin: auto; }
+        input, textarea, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #1a3a5a; background: #000; color: white; box-sizing: border-box; }
+        button { background: #00d4ff; color: #000; font-weight: bold; cursor: pointer; border: none; }
+        button:hover { background: #fff; }
+        .item { background: #002b53; padding: 10px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border-radius: 6px; }
+        .del-btn { background: #ff4d4d; width: auto; padding: 5px 10px; color: white; }
     </style>
 </head>
 <body>
 
-<div class="admin-card">
-    <h2>🛠 Додати нову модель</h2>
-    <input type="text" id="name" placeholder="Назва (напр. Кібер-Дракон)">
-    <textarea id="desc" placeholder="Опис товару..."></textarea>
-    <input type="number" id="price" placeholder="Базова ціна (грн)">
+<div class="card">
+    <h2>🛠 Керування товарами (Хмара)</h2>
+    <input type="text" id="name" placeholder="Назва товару">
+    <textarea id="desc" placeholder="Опис товару"></textarea>
+    <input type="number" id="price" placeholder="Ціна (грн)">
     <input type="text" id="img" placeholder="Посилання на фото (URL)">
+    <button onclick="saveToCloud()">Опублікувати на сайт</button>
     
-    <p style="font-size: 12px; color: #aaa;">*Розміри S, M, L та кольори додаються автоматично</p>
-    <button onclick="addProduct()">Опублікувати на сайт</button>
-    
-    <div class="product-list" id="admin-list">
-        <h3>Твої товари:</h3>
-    </div>
+    <div id="list" style="margin-top:20px;">
+        <h3>Товари в базі:</h3>
+        </div>
 </div>
 
 <script>
-    function addProduct() {
-        const product = {
-            id: Date.now(),
-            name: document.getElementById('name').value,
-            desc: document.getElementById('desc').value,
-            price: document.getElementById('price').value,
-            img: document.getElementById('img').value || 'https://via.placeholder.com/150'
-        };
+    const supabaseUrl = 'https://kkyrhxuwllawvfqltgil.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtreXJoeHV3bGxhd3ZmcWx0Z2lsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MDMzNzUsImV4cCI6MjA4Mzk3OTM3NX0.r8DPctn9mF9EFLbU5_5cLrBcN-7oIo8p02BktKxKSVM';
+    const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-        let products = JSON.parse(localStorage.getItem('3d_products')) || [];
-        products.push(product);
-        localStorage.setItem('3d_products', JSON.stringify(products));
+    async function saveToCloud() {
+        const name = document.getElementById('name').value;
+        const desc = document.getElementById('desc').value;
+        const price = document.getElementById('price').value;
+        const img = document.getElementById('img').value || 'https://via.placeholder.com/150';
+
+        if(!name || !price) return alert("Заповніть назву та ціну!");
+
+        const { error } = await _supabase.from('products').insert([{ name, desc, price: parseInt(price), img }]);
         
-        alert("Товар додано!");
-        location.reload();
+        if (error) alert("Помилка: " + error.message);
+        else { alert("Додано!"); location.reload(); }
     }
 
-    function deleteProduct(id) {
-        let products = JSON.parse(localStorage.getItem('3d_products'));
-        products = products.filter(p => p.id !== id);
-        localStorage.setItem('3d_products', JSON.stringify(products));
-        location.reload();
+    async function loadList() {
+        const { data: products } = await _supabase.from('products').select('*');
+        const listDiv = document.getElementById('list');
+        if(products) {
+            products.forEach(p => {
+                listDiv.innerHTML += `
+                    <div class="item">
+                        <span>${p.name}</span>
+                        <button class="del-btn" onclick="deleteProd(${p.id})">Видалити</button>
+                    </div>`;
+            });
+        }
     }
 
-    // Показ списку
-    const list = JSON.parse(localStorage.getItem('3d_products')) || [];
-    const container = document.getElementById('admin-list');
-    list.forEach(p => {
-        container.innerHTML += `
-            <div class="item">
-                <span>${p.name} - ${p.price}грн</span>
-                <button onclick="deleteProduct(${p.id})" style="width:auto; background:red;">Видалити</button>
-            </div>`;
-    });
+    async function deleteProd(id) {
+        if(confirm("Видалити?")) {
+            await _supabase.from('products').delete().eq('id', id);
+            location.reload();
+        }
+    }
+    loadList();
 </script>
 </body>
 </html>
