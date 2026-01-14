@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>3DPrintCraft | Магазин</title>
+    <style>
+        :root { --bg: #000c18; --card: #001f3f; --accent: #00d4ff; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; overflow-x: hidden; }
+        header { background: var(--card); padding: 15px 5%; display: flex; justify-content: space-between; border-bottom: 2px solid var(--accent); align-items: center; position: sticky; top: 0; z-index: 100; }
+        .container { padding: 40px 5%; max-width: 1000px; margin: auto; }
+        .section { display: none; }
+        .active { display: block; }
+        .card { background: var(--card); padding: 25px; border-radius: 12px; border: 1px solid #1a3a5a; margin-bottom: 20px; }
+        input, select, button { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; border: 1px solid #004080; background: #000c18; color: white; box-sizing: border-box; }
+        button { background: var(--accent); color: #000; font-weight: bold; cursor: pointer; border: none; transition: 0.3s; }
+        button:hover { background: #fff; transform: translateY(-2px); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        #user-display { font-weight: bold; color: var(--accent); margin-right: 10px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="font-size: 24px; font-weight: bold; color: var(--accent);">3DPrintCraft</div>
+    <div style="display: flex; align-items: center;">
+        <span id="user-display"></span>
+        <button onclick="showSection('cart-page')" style="width: auto; padding: 8px 15px; margin-right: 10px;">🛒 (<span id="cart-count">0</span>)</button>
+        <button onclick="logout()" id="logout-btn" style="display:none; width: auto; padding: 8px 15px; background: none; border: 1px solid red; color: red;">Вийти</button>
+    </div>
+</header>
+
+<div class="container">
+    <div id="auth-page" class="section active">
+        <div class="card" style="max-width: 400px; margin: auto;">
+            <h2 id="auth-title">Створити акаунт</h2>
+            <input type="email" id="email" placeholder="Ваш Gmail">
+            <input type="password" id="password" placeholder="Пароль">
+            <button onclick="handleAuth()" id="auth-btn">Зареєструватися</button>
+            <p id="toggle-text" onclick="toggleAuthMode()" style="text-align:center; cursor:pointer; color: var(--accent); font-size: 14px;">Вже є акаунт? Увійти</p>
+        </div>
+    </div>
+
+    <div id="catalog-page" class="section">
+        <h2>Каталог 3D Моделей</h2>
+        <div id="catalog-grid" class="grid"></div>
+    </div>
+
+    <div id="cart-page" class="section">
+        <h2>Ваш кошик</h2>
+        <div id="cart-list"></div>
+        <div class="card" id="final-form" style="display:none; margin-top:20px;">
+            <h3>Деталі друку</h3>
+            <form action="https://formspree.io/f/mpqqwwdy" method="POST">
+                <input type="hidden" name="Customer_Email" id="form-email">
+                <input type="hidden" name="Order_Details" id="form-items">
+                
+                <label>Бажаний розмір:</label>
+                <select name="Selected_Size">
+                    <option>S (Малий)</option>
+                    <option selected>M (Стандарт)</option>
+                    <option>L (Великий)</option>
+                </select>
+
+                <label>Колір пластику:</label>
+                <select name="Selected_Color">
+                    <option>Deep Black</option>
+                    <option>Snow White</option>
+                    <option>Galaxy Blue</option>
+                    <option>Silk Gold</option>
+                </select>
+
+                <button type="submit">Оформити замовлення</button>
+            </form>
+        </div>
+        <button onclick="showSection('catalog-page')" style="background:none; border:1px solid white; color:white; margin-top:10px;">← Назад до магазину</button>
+    </div>
+</div>
+
+<script>
+    let isLoginMode = false;
+    let cart = [];
+
+    // АВТОВХІД ПРИ ЗАВАНТАЖЕННІ
+    window.onload = function() {
+        const savedUser = localStorage.getItem('3d_session');
+        if (savedUser) {
+            loginSuccess(savedUser);
+        }
+    };
+
+    function showSection(id) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+
+    function toggleAuthMode() {
+        isLoginMode = !isLoginMode;
+        document.getElementById('auth-title').innerText = isLoginMode ? "Вхід" : "Створити акаунт";
+        document.getElementById('auth-btn').innerText = isLoginMode ? "Увійти" : "Зареєструватися";
+        document.getElementById('toggle-text').innerText = isLoginMode ? "Немає акаунту? Реєстрація" : "Вже є акаунт? Увійти";
+    }
+
+    function handleAuth() {
+        const email = document.getElementById('email').value;
+        const pass = document.getElementById('password').value;
+        let users = JSON.parse(localStorage.getItem('3d_users')) || [];
+
+        if (!email.includes('@') || pass.length < 4) {
+            alert("Введіть коректні дані!");
+            return;
+        }
+
+        if (isLoginMode) {
+            const user = users.find(u => u.email === email && u.pass === pass);
+            if (user) {
+                localStorage.setItem('3d_session', email); // Запам'ятовуємо користувача
+                loginSuccess(email);
+            } else {
+                alert("Помилка входу!");
+            }
+        } else {
+            if (users.find(u => u.email === email)) {
+                alert("Email вже зайнятий!");
+            } else {
+                users.push({ email, pass });
+                localStorage.setItem('3d_users', JSON.stringify(users));
+                alert("Реєстрація успішна! Тепер увійдіть.");
+                toggleAuthMode();
+            }
+        }
+    }
+
+    function loginSuccess(email) {
+        document.getElementById('user-display').innerText = email;
+        document.getElementById('form-email').value = email;
+        document.getElementById('logout-btn').style.display = "block";
+        showSection('catalog-page');
+        loadProducts();
+    }
+
+    function logout() {
+        localStorage.removeItem('3d_session');
+        location.reload();
+    }
+
+    function loadProducts() {
+        const products = JSON.parse(localStorage.getItem('3d_products')) || [];
+        const grid = document.getElementById('catalog-grid');
+        grid.innerHTML = products.length ? "" : "<p>Каталог порожній. Додайте товари в адмінці.</p>";
+        
+        products.forEach(p => {
+            grid.innerHTML += `
+                <div class="card">
+                    <div style="height:160px; background:url('${p.img}') center/cover; border-radius:8px; background-color:#000;"></div>
+                    <h3>${p.name}</h3>
+                    <p style="color:#aaa; font-size:14px;">${p.desc || ''}</p>
+                    <p><b style="color:var(--accent);">${p.price} грн</b></p>
+                    <button onclick="addToCart('${p.name}', ${p.price})">Додати в кошик</button>
+                </div>`;
+        });
+    }
+
+    function addToCart(name, price) {
+        cart.push({name, price});
+        document.getElementById('cart-count').innerText = cart.length;
+        renderCart();
+    }
+
+    function renderCart() {
+        const list = document.getElementById('cart-list');
+        list.innerHTML = cart.map((item, i) => `
+            <div style="display:flex; justify-content:space-between; background:#002b53; padding:12px; margin-bottom:8px; border-radius:8px; border-left: 4px solid var(--accent);">
+                <span>${item.name} — ${item.price} грн</span>
+                <button onclick="cart.splice(${i},1); renderCart();" style="width:auto; background:none; color:red; font-size:18px;">✕</button>
+            </div>`).join('');
+        
+        document.getElementById('form-items').value = cart.map(i => i.name).join(', ');
+        document.getElementById('final-form').style.display = cart.length ? "block" : "none";
+        document.getElementById('cart-count').innerText = cart.length;
+    }
+</script>
+</body>
+</html>
